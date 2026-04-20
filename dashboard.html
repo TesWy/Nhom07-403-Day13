@@ -1,383 +1,1335 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Day 13 Observability Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <title>Day 13 – Observability Dashboard | Nhóm 07</title>
+  <meta name="description" content="Live observability dashboard cho Day 13 AI Observability Lab – theo dõi latency, traffic, error rate, cost, token usage và quality score real-time." />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #0f1117;
-      --surface: #1a1d27;
-      --border: #2a2d3e;
-      --accent: #6c63ff;
-      --green: #00d9a3;
-      --red: #ff4d6d;
-      --yellow: #ffd166;
-      --blue: #4cc9f0;
-      --text: #e2e8f0;
-      --muted: #8892a4;
-      --slo-red: rgba(255,77,109,0.25);
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', 'Segoe UI', sans-serif;
-      min-height: 100vh;
+      --bg-primary:   #0a0d14;
+      --bg-card:      #111827;
+      --bg-card2:     #1a2236;
+      --border:       #1e2d45;
+      --accent-blue:  #3b82f6;
+      --accent-cyan:  #06b6d4;
+      --accent-green: #10b981;
+      --accent-yellow:#f59e0b;
+      --accent-red:   #ef4444;
+      --accent-purple:#8b5cf6;
+      --text-primary: #f1f5f9;
+      --text-muted:   #64748b;
+      --text-dim:     #94a3b8;
+      --slo-red:      #ef4444;
+      --glow-blue:    0 0 20px rgba(59,130,246,0.25);
+      --glow-green:   0 0 20px rgba(16,185,129,0.25);
+      --glow-red:     0 0 20px rgba(239,68,68,0.25);
     }
 
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── HEADER ── */
     header {
-      background: var(--surface);
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
       border-bottom: 1px solid var(--border);
-      padding: 16px 28px;
+      padding: 18px 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
     }
-    header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.3px; }
-    header h1 span { color: var(--accent); }
-    #status {
+
+    .header-left {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--muted);
+      gap: 14px;
     }
-    #dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--green);
+
+    .logo-pulse {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 10px var(--accent-green);
       animation: pulse 2s infinite;
     }
+
     @keyframes pulse {
-      0%,100% { opacity:1; } 50% { opacity:0.3; }
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.85); }
     }
 
-    .grid {
+    .header-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 24px;
+      padding: 5px 12px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--accent-green);
+      transition: all 0.3s;
+    }
+
+    .status-pill.error {
+      background: rgba(239,68,68,0.1);
+      border-color: rgba(239,68,68,0.3);
+      color: var(--accent-red);
+    }
+
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 1.5s infinite;
+    }
+
+    .refresh-info {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .refresh-timer {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent-cyan);
+      font-size: 0.8rem;
+      min-width: 24px;
+      text-align: right;
+    }
+
+    /* ── API CONFIG BAR ── */
+    .config-bar {
+      background: var(--bg-card2);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.78rem;
+    }
+
+    .config-bar label { color: var(--text-muted); white-space: nowrap; }
+
+    #api-base {
+      flex: 1;
+      max-width: 320px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #api-base:focus { border-color: var(--accent-blue); }
+
+    .btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
+
+    .btn-danger {
+      background: rgba(239,68,68,0.15);
+      border: 1px solid rgba(239,68,68,0.4);
+      color: var(--accent-red);
+    }
+
+    .btn-danger:hover { background: rgba(239,68,68,0.3); }
+
+    /* ── STAT STRIP ── */
+    .stat-strip {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-item {
+      background: var(--bg-card);
+      padding: 14px 20px;
+      text-align: center;
+      transition: background 0.2s;
+    }
+
+    .stat-item:hover { background: var(--bg-card2); }
+
+    .stat-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.3rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .stat-unit {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    /* ── MAIN GRID ── */
+    .main-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      padding: 20px 24px;
+      grid-template-rows: auto auto;
+      gap: 20px;
+      padding: 24px 32px;
     }
-    @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 700px)  { .grid { grid-template-columns: 1fr; } }
 
-    .panel {
-      background: var(--surface);
+    /* ── CARD ── */
+    .card {
+      background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px 20px;
+      border-radius: 14px;
+      padding: 20px;
       position: relative;
       overflow: hidden;
+      transition: box-shadow 0.3s, border-color 0.3s;
     }
-    .panel::before {
+
+    .card::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0;
-      height: 3px;
-      background: var(--accent);
-      border-radius: 12px 12px 0 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+      opacity: 0.7;
     }
-    .panel.green::before  { background: var(--green); }
-    .panel.red::before    { background: var(--red); }
-    .panel.yellow::before { background: var(--yellow); }
-    .panel.blue::before   { background: var(--blue); }
-    .panel.purple::before { background: var(--accent); }
 
-    .panel-title {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--muted);
-      margin-bottom: 12px;
+    .card:hover {
+      box-shadow: var(--glow-blue);
+      border-color: rgba(59,130,246,0.3);
     }
-    .big-num {
-      font-size: 42px;
-      font-weight: 800;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-    .sub-row {
+
+    .card-header {
       display: flex;
-      gap: 16px;
-      margin-top: 10px;
-      font-size: 12px;
-      color: var(--muted);
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
     }
-    .sub-row span b { color: var(--text); }
-    .slo-badge {
-      display: inline-block;
+
+    .card-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-icon {
+      width: 20px; height: 20px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+    }
+
+    .badge {
+      font-size: 0.65rem;
+      font-weight: 600;
       padding: 2px 8px;
       border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      margin-left: 8px;
+      font-family: 'JetBrains Mono', monospace;
     }
-    .slo-ok  { background: rgba(0,217,163,0.15); color: var(--green); }
-    .slo-bad { background: rgba(255,77,109,0.15); color: var(--red); }
 
-    canvas { max-height: 160px; }
+    .badge-slo {
+      background: rgba(239,68,68,0.15);
+      color: var(--accent-red);
+      border: 1px solid rgba(239,68,68,0.3);
+    }
 
+    .badge-ok {
+      background: rgba(16,185,129,0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(16,185,129,0.3);
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 220px;
+    }
+
+    /* ── PANEL 6: GAUGE ── */
+    .gauge-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 220px;
+      gap: 12px;
+    }
+
+    .gauge-ring {
+      position: relative;
+      width: 160px; height: 160px;
+    }
+
+    .gauge-svg {
+      width: 100%; height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .gauge-bg { fill: none; stroke: var(--border); stroke-width: 16; }
+    .gauge-fill {
+      fill: none;
+      stroke-width: 16;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1), stroke 0.5s;
+    }
+
+    .gauge-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gauge-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.8rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .gauge-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 4px;
+    }
+
+    .gauge-zones {
+      display: flex;
+      gap: 10px;
+    }
+
+    .zone {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+    }
+
+    .zone-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ── INCIDENTS PANEL ── */
+    .incidents-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .incident-card {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      transition: all 0.25s;
+    }
+
+    .incident-card.active {
+      border-color: rgba(239,68,68,0.5);
+      background: rgba(239,68,68,0.07);
+      box-shadow: 0 0 14px rgba(239,68,68,0.15);
+    }
+
+    .incident-name {
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 4px;
+    }
+
+    .incident-desc {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+
+    .incident-toggle {
+      width: 100%;
+      padding: 4px;
+      border-radius: 6px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .incident-toggle.off {
+      background: rgba(16,185,129,0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(16,185,129,0.3);
+    }
+
+    .incident-toggle.on {
+      background: rgba(239,68,68,0.2);
+      color: var(--accent-red);
+      border: 1px solid rgba(239,68,68,0.4);
+    }
+
+    /* ── BOTTOM ROW ── */
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 0 32px 24px;
+    }
+
+    /* ── LOG TABLE ── */
+    .log-table-wrap {
+      overflow-y: auto;
+      max-height: 220px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .log-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+    }
+
+    .log-table th {
+      position: sticky;
+      top: 0;
+      background: var(--bg-card2);
+      color: var(--text-muted);
+      font-size: 0.63rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 7px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      z-index: 1;
+    }
+
+    .log-table td {
+      padding: 5px 10px;
+      border-bottom: 1px solid rgba(30,45,69,0.5);
+      vertical-align: top;
+      color: var(--text-dim);
+    }
+
+    .log-table tr:hover td { background: var(--bg-card2); }
+
+    .log-level {
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .log-level.info    { background: rgba(59,130,246,0.2);  color: var(--accent-blue);   }
+    .log-level.warning { background: rgba(245,158,11,0.2);  color: var(--accent-yellow); }
+    .log-level.error   { background: rgba(239,68,68,0.2);   color: var(--accent-red);    }
+
+    .log-event    { color: var(--text-primary); }
+    .log-ts       { color: var(--text-muted); font-size: 0.6rem; }
+    .empty-hint   { text-align: center; color: var(--text-muted); padding: 24px; font-size: 0.75rem; }
+
+    /* ── ALERTS SECTION ── */
+    .alerts-list   { display: flex; flex-direction: column; gap: 8px; }
+    .alert-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      transition: all 0.2s;
+    }
+
+    .alert-item.firing {
+      border-color: rgba(239,68,68,0.4);
+      background: rgba(239,68,68,0.06);
+      animation: alertGlow 2s infinite;
+    }
+
+    @keyframes alertGlow {
+      0%,100% { box-shadow: none; }
+      50%      { box-shadow: 0 0 12px rgba(239,68,68,0.2); }
+    }
+
+    .alert-severity {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .sev-P1 { background: rgba(239,68,68,0.2);  color: var(--accent-red); }
+    .sev-P2 { background: rgba(245,158,11,0.2); color: var(--accent-yellow); }
+
+    .alert-name {
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 3px;
+    }
+
+    .alert-desc {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .alert-status {
+      margin-left: auto;
+      font-size: 0.65rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .firing-text { color: var(--accent-red); animation: pulse 1.5s infinite; }
+    .ok-text     { color: var(--text-muted); }
+
+    /* ── FOOTER ── */
     footer {
       text-align: center;
-      font-size: 12px;
-      color: var(--muted);
-      padding: 12px 0 24px;
+      padding: 16px;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      border-top: 1px solid var(--border);
     }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar       { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg-card); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   </style>
 </head>
 <body>
 
+<!-- ════════════ HEADER ════════════ -->
 <header>
-  <h1>📊 Day 13 <span>Observability</span> Dashboard</h1>
-  <div id="status">
-    <div id="dot"></div>
-    <span id="last-refresh">Connecting…</span>
-    <span>· Auto-refresh 30s</span>
+  <div class="header-left">
+    <div class="logo-pulse" id="live-dot"></div>
+    <div>
+      <div class="header-title">⚡ Observability Dashboard</div>
+      <div class="header-subtitle">Day 13 – Nhóm 07 · FastAPI AI Agent Monitor</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="health-pill">
+      <span class="status-dot"></span>
+      <span id="health-text">Connecting…</span>
+    </div>
+    <div class="refresh-info">
+      🔄 Auto-refresh: <span class="refresh-timer" id="countdown">15</span>s
+    </div>
+    <button class="btn btn-primary" id="btn-refresh" onclick="fetchAll()">↺ Refresh Now</button>
   </div>
 </header>
 
-<div class="grid">
+<!-- ════════════ CONFIG BAR ════════════ -->
+<div class="config-bar">
+  <label>🔗 API Base URL:</label>
+  <input id="api-base" type="text" value="http://localhost:8000" spellcheck="false" />
+  <button class="btn btn-primary" onclick="fetchAll()">Connect</button>
+  <span style="color:var(--text-muted)">|</span>
+  <label>Incidents:</label>
+  <button class="btn btn-danger" onclick="triggerIncident('rag_slow')">💥 RAG Slow</button>
+  <button class="btn btn-danger" onclick="triggerIncident('tool_fail')">⚠ Tool Fail</button>
+  <button class="btn btn-danger" onclick="triggerIncident('cost_spike')">💰 Cost Spike</button>
+  <span style="color:var(--text-muted); margin-left:auto; font-size:0.7rem;" id="last-updated">–</span>
+</div>
 
-  <!-- Panel 1: Latency P50/P95/P99 -->
-  <div class="panel purple">
-    <div class="panel-title">⏱ Latency — P50 / P95 / P99 (ms)</div>
-    <div class="big-num" id="lat-p95">—</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:2px">P95 <span class="slo-badge slo-ok" id="lat-slo-badge">≤ 1500ms SLO</span></div>
-    <div class="sub-row">
-      <span>P50: <b id="lat-p50">—</b> ms</span>
-      <span>P99: <b id="lat-p99">—</b> ms</span>
+<!-- ════════════ STAT STRIP ════════════ -->
+<div class="stat-strip">
+  <div class="stat-item">
+    <div class="stat-label">Total Traffic</div>
+    <div class="stat-value" style="color:var(--accent-cyan)" id="s-traffic">–</div>
+    <div class="stat-unit">requests</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">Latency P50</div>
+    <div class="stat-value" style="color:var(--accent-green)" id="s-p50">–</div>
+    <div class="stat-unit">ms</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">Latency P95</div>
+    <div class="stat-value" style="color:var(--accent-yellow)" id="s-p95">–</div>
+    <div class="stat-unit">ms</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">Latency P99</div>
+    <div class="stat-value" style="color:var(--accent-red)" id="s-p99">–</div>
+    <div class="stat-unit">ms</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">Total Cost</div>
+    <div class="stat-value" style="color:var(--accent-purple)" id="s-cost">–</div>
+    <div class="stat-unit">USD</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">Quality Avg</div>
+    <div class="stat-value" style="color:var(--accent-green)" id="s-quality">–</div>
+    <div class="stat-unit">score</div>
+  </div>
+</div>
+
+<!-- ════════════ MAIN 6-PANEL GRID ════════════ -->
+<div class="main-grid">
+
+  <!-- Panel 1: Latency -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-icon" style="background:rgba(59,130,246,0.2)">📈</div>
+        Latency P50 / P95 / P99
+      </div>
+      <span class="badge badge-slo" id="slo-badge">SLO 1500ms</span>
     </div>
-    <canvas id="chart-latency" style="margin-top:14px"></canvas>
+    <div class="chart-wrap"><canvas id="chart-latency"></canvas></div>
   </div>
 
   <!-- Panel 2: Traffic -->
-  <div class="panel green">
-    <div class="panel-title">🚦 Traffic — Total Requests</div>
-    <div class="big-num" id="traffic">—</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:2px">cumulative requests</div>
-    <div class="sub-row">
-      <span>Since startup</span>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-icon" style="background:rgba(6,182,212,0.2)">📊</div>
+        Traffic & Throughput
+      </div>
+      <span class="badge" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);border:1px solid rgba(6,182,212,0.3)">RPM</span>
     </div>
-    <canvas id="chart-traffic" style="margin-top:14px"></canvas>
+    <div class="chart-wrap"><canvas id="chart-traffic"></canvas></div>
   </div>
 
   <!-- Panel 3: Error Rate -->
-  <div class="panel red">
-    <div class="panel-title">❌ Error Rate — Breakdown</div>
-    <div class="big-num" id="err-rate">—</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:2px">error % <span class="slo-badge slo-ok" id="err-slo-badge">SLO &lt; 2%</span></div>
-    <div class="sub-row" id="err-breakdown">
-      <span>No errors detected</span>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-icon" style="background:rgba(239,68,68,0.2)">🔴</div>
+        Error Rate Breakdown
+      </div>
+      <span class="badge" id="error-badge" style="background:rgba(16,185,129,0.15);color:var(--accent-green);border:1px solid rgba(16,185,129,0.3)">0 Errors</span>
     </div>
-    <canvas id="chart-errors" style="margin-top:14px"></canvas>
+    <div class="chart-wrap"><canvas id="chart-errors"></canvas></div>
   </div>
 
   <!-- Panel 4: Cost -->
-  <div class="panel yellow">
-    <div class="panel-title">💰 Cost Over Time (USD)</div>
-    <div class="big-num" id="total-cost">—</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:2px">total · <b id="avg-cost">—</b> avg/req</div>
-    <div class="sub-row">
-      <span>Daily budget SLO: <b>$5.00</b></span>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-icon" style="background:rgba(139,92,246,0.2)">💰</div>
+        Cost Over Time (Accumulated)
+      </div>
+      <span class="badge" style="background:rgba(139,92,246,0.15);color:var(--accent-purple);border:1px solid rgba(139,92,246,0.3)">USD</span>
     </div>
-    <canvas id="chart-cost" style="margin-top:14px"></canvas>
+    <div class="chart-wrap"><canvas id="chart-cost"></canvas></div>
   </div>
 
-  <!-- Panel 5: Tokens In/Out -->
-  <div class="panel blue">
-    <div class="panel-title">🔤 Tokens In / Out</div>
-    <div class="big-num" id="tokens-total">—</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:2px">total tokens processed</div>
-    <div class="sub-row">
-      <span>In: <b id="tok-in">—</b></span>
-      <span>Out: <b id="tok-out">—</b></span>
+  <!-- Panel 5: Token Usage -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-icon" style="background:rgba(245,158,11,0.2)">🔤</div>
+        Token Usage (In vs Out)
+      </div>
+      <span class="badge" style="background:rgba(245,158,11,0.15);color:var(--accent-yellow);border:1px solid rgba(245,158,11,0.3)">Tokens</span>
     </div>
-    <canvas id="chart-tokens" style="margin-top:14px"></canvas>
+    <div class="chart-wrap"><canvas id="chart-tokens"></canvas></div>
   </div>
 
-  <!-- Panel 6: Quality Score -->
-  <div class="panel">
-    <div class="panel-title">⭐ Quality Proxy — Avg Score</div>
-    <div class="big-num" id="quality">—</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:2px">heuristic 0.0→1.0 · SLO ≥ 0.70 <span class="slo-badge slo-ok" id="qual-slo-badge">OK</span></div>
-    <div class="sub-row">
-      <span>Based on answer length + doc overlap</span>
+  <!-- Panel 6: Quality Gauge -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-icon" style="background:rgba(16,185,129,0.2)">⭐</div>
+        Quality Proxy Index
+      </div>
+      <span class="badge" style="background:rgba(16,185,129,0.15);color:var(--accent-green);border:1px solid rgba(16,185,129,0.3)">0.0–1.0</span>
     </div>
-    <canvas id="chart-quality" style="margin-top:14px"></canvas>
+    <div class="gauge-wrap">
+      <div class="gauge-ring">
+        <svg class="gauge-svg" viewBox="0 0 100 100">
+          <circle class="gauge-bg" cx="50" cy="50" r="40" />
+          <circle class="gauge-fill" id="gauge-fill" cx="50" cy="50" r="40"
+            stroke-dasharray="251.3"
+            stroke-dashoffset="251.3"
+            stroke="var(--accent-green)" />
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-value" id="gauge-value" style="color:var(--accent-green)">–</div>
+          <div class="gauge-label">Quality</div>
+        </div>
+      </div>
+      <div class="gauge-zones">
+        <div class="zone"><div class="zone-dot" style="background:var(--accent-green)"></div>> 0.7 Good</div>
+        <div class="zone"><div class="zone-dot" style="background:var(--accent-yellow)"></div>0.4–0.7 Warn</div>
+        <div class="zone"><div class="zone-dot" style="background:var(--accent-red)"></div>< 0.4 Bad</div>
+      </div>
+    </div>
   </div>
 
-</div>
+</div><!-- /main-grid -->
 
-<footer>Day 13 Observability Lab · VinUNI AI · Polling <strong>http://localhost:8000/metrics</strong></footer>
+<!-- ════════════ BOTTOM ROW ════════════ -->
+<div class="bottom-row">
+
+  <!-- Live Log Stream -->
+  <div class="card" style="border-radius:14px">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-icon" style="background:rgba(6,182,212,0.2)">📋</div>
+        Live Log Stream
+      </div>
+      <span style="font-size:0.7rem;color:var(--text-muted)">Last 50 entries</span>
+    </div>
+    <div class="log-table-wrap">
+      <table class="log-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Level</th>
+            <th>Event</th>
+            <th>Service</th>
+            <th>Latency</th>
+          </tr>
+        </thead>
+        <tbody id="log-tbody">
+          <tr><td colspan="5" class="empty-hint">Waiting for logs…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Incidents & Alerts -->
+  <div class="card" style="border-radius:14px">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-icon" style="background:rgba(239,68,68,0.2)">🚨</div>
+        Incidents & Alert Rules
+      </div>
+    </div>
+
+    <!-- Incidents -->
+    <div class="incidents-grid" id="incidents-grid">
+      <div class="incident-card" id="inc-rag_slow">
+        <div class="incident-name" style="color:var(--accent-yellow)">rag_slow</div>
+        <div class="incident-desc">Retrieval latency spike. Tìm span RAG chậm trong trace.</div>
+        <button class="incident-toggle off" onclick="toggleIncident('rag_slow', this)">Enable</button>
+      </div>
+      <div class="incident-card" id="inc-tool_fail">
+        <div class="incident-name" style="color:var(--accent-red)">tool_fail</div>
+        <div class="incident-desc">Vector store error. Xác định error_type từ logs.</div>
+        <button class="incident-toggle off" onclick="toggleIncident('tool_fail', this)">Enable</button>
+      </div>
+      <div class="incident-card" id="inc-cost_spike">
+        <div class="incident-name" style="color:var(--accent-purple)">cost_spike</div>
+        <div class="incident-desc">Token usage spike. Giải thích chi phí output token tăng cao.</div>
+        <button class="incident-toggle off" onclick="toggleIncident('cost_spike', this)">Enable</button>
+      </div>
+    </div>
+
+    <!-- Alert Rules -->
+    <div style="margin-top:12px">
+      <div style="font-size:0.72rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em">Alert Rules</div>
+      <div class="alerts-list" id="alerts-list">
+        <div class="alert-item" data-rule="high_latency_p95">
+          <span class="alert-severity sev-P2">P2</span>
+          <div style="flex:1">
+            <div class="alert-name">high_latency_p95</div>
+            <div class="alert-desc">P95 &gt; 1500ms – hệ thống đang chậm bất thường</div>
+          </div>
+          <span class="alert-status ok-text" id="alert-latency-status">OK</span>
+        </div>
+        <div class="alert-item" data-rule="critical_error_rate">
+          <span class="alert-severity sev-P1">P1</span>
+          <div style="flex:1">
+            <div class="alert-name">critical_error_rate</div>
+            <div class="alert-desc">Error rate &gt; 5% trong 5 phút</div>
+          </div>
+          <span class="alert-status ok-text" id="alert-error-status">OK</span>
+        </div>
+        <div class="alert-item" data-rule="cost_budget_spike">
+          <span class="alert-severity sev-P2">P2</span>
+          <div style="flex:1">
+            <div class="alert-name">cost_budget_spike</div>
+            <div class="alert-desc">Hourly cost &gt; $5.0 – chi phí bất thường</div>
+          </div>
+          <span class="alert-status ok-text" id="alert-cost-status">OK</span>
+        </div>
+        <div class="alert-item" data-rule="token_burn_spike">
+          <span class="alert-severity sev-P2">P2</span>
+          <div style="flex:1">
+            <div class="alert-name">token_burn_spike</div>
+            <div class="alert-desc">Tokens out &gt; 50 000/min – kiểm tra DoS/loop</div>
+          </div>
+          <span class="alert-status ok-text" id="alert-token-status">OK</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /bottom-row -->
+
+<footer>
+  Day 13 Observability Lab · Nhóm 07 – 403 · Live data from FastAPI at <span id="footer-url">localhost:8000</span> · Auto-refresh every 15s
+</footer>
 
 <script>
-  const API = 'http://localhost:8000/metrics';
-  const MAX_POINTS = 20;
+/* ═══════════════════════════════════════════════
+   STATE & HISTORY
+═══════════════════════════════════════════════ */
+const MAX_HISTORY   = 30;
+const REFRESH_SEC   = 15;
 
-  // ── history buffers ─────────────────────────────────────────────
-  const H = {
-    labels:    [],
-    p50:[], p95:[], p99:[],
-    traffic:   [],
-    errRate:   [],
-    cost:      [],
-    tokIn:[],  tokOut:[],
-    quality:   [],
-  };
+let history = {
+  labels:     [],
+  p50:        [], p95: [], p99: [],
+  traffic:    [],
+  costAccum:  [],
+  tokensIn:   [], tokensOut: [],
+};
 
-  // ── Chart factory ───────────────────────────────────────────────
-  function mkLine(id, datasets, opts={}) {
-    return new Chart(document.getElementById(id), {
-      type: 'line',
-      data: { labels: H.labels, datasets },
-      options: {
-        animation: false,
-        plugins: { legend: { display: datasets.length > 1, labels:{ color:'#8892a4', boxWidth:10, font:{size:11} } } },
-        scales: {
-          x: { display: false },
-          y: { grid:{ color:'#2a2d3e' }, ticks:{ color:'#8892a4', font:{size:10} }, ...opts.y },
-        },
-        elements: { point:{ radius:0 }, line:{ tension:0.35, borderWidth:2 } },
-        maintainAspectRatio: false,
-      }
-    });
-  }
+let charts        = {};
+let countdownVal  = REFRESH_SEC;
+let timerInterval = null;
+let fetchCount    = 0;
+let incidentState = { rag_slow: false, tool_fail: false, cost_spike: false };
 
-  function mkBar(id, datasets) {
-    return new Chart(document.getElementById(id), {
-      type: 'bar',
-      data: { labels: H.labels, datasets },
-      options: {
-        animation: false,
-        plugins: { legend:{ display:false } },
-        scales: {
-          x: { display:false },
-          y: { grid:{ color:'#2a2d3e' }, ticks:{ color:'#8892a4', font:{size:10} }, min:0, max:1 },
-        },
-        maintainAspectRatio: false,
-      }
-    });
-  }
+/* ═══════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════ */
+function apiBase() {
+  return document.getElementById('api-base').value.replace(/\/$/, '');
+}
 
-  // SLO lines plugin
-  const sloPlugin = (yVal, color) => ({
-    id: 'sloLine',
-    afterDraw(chart) {
-      const {ctx, chartArea:{left,right}, scales:{y}} = chart;
-      const yPx = y.getPixelForValue(yVal);
-      ctx.save();
-      ctx.setLineDash([6,4]);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(left,yPx); ctx.lineTo(right,yPx); ctx.stroke();
-      ctx.restore();
+function now() {
+  return new Date().toLocaleTimeString('vi-VN', { hour12: false });
+}
+
+function setHealth(ok, text) {
+  const pill = document.getElementById('health-pill');
+  const txt  = document.getElementById('health-text');
+  pill.className = 'status-pill' + (ok ? '' : ' error');
+  txt.textContent = text;
+}
+
+function pushHistory(key, val) {
+  history[key].push(val);
+  if (history[key].length > MAX_HISTORY) history[key].shift();
+}
+
+/* ═══════════════════════════════════════════════
+   CHART FACTORY
+═══════════════════════════════════════════════ */
+Chart.defaults.color          = '#64748b';
+Chart.defaults.borderColor    = '#1e2d45';
+Chart.defaults.font.family    = "'Inter', sans-serif";
+Chart.defaults.font.size      = 11;
+Chart.defaults.plugins.legend.labels.boxWidth = 10;
+
+function makeChart(id, cfg) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, cfg);
+}
+
+function gradient(ctx, colors) {
+  const g = ctx.createLinearGradient(0, 0, 0, 220);
+  g.addColorStop(0,   colors[0]);
+  g.addColorStop(1,   colors[1]);
+  return g;
+}
+
+/* ── Panel 1: Latency line chart ── */
+function initLatencyChart() {
+  const ctx = document.getElementById('chart-latency').getContext('2d');
+  charts.latency = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'P50', data: [], borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.4, borderWidth: 2, pointRadius: 2 },
+        { label: 'P95', data: [], borderColor: '#f59e0b', backgroundColor: 'transparent', tension: 0.4, borderWidth: 2, pointRadius: 2 },
+        { label: 'P99', data: [], borderColor: '#ef4444', backgroundColor: 'transparent', tension: 0.4, borderWidth: 2, pointRadius: 2 },
+        { label: 'SLO 1500ms', data: [], borderColor: '#ef444455', borderDash: [6,4], backgroundColor: 'transparent', tension: 0, borderWidth: 1.5, pointRadius: 0 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { color: '#1e2d4550' }, ticks: { maxTicksLimit: 8 } },
+        y: { grid: { color: '#1e2d4550' }, title: { display: true, text: 'ms' } }
+      },
+      plugins: { legend: { position: 'top' } }
     }
   });
+}
 
-  // ── Create charts ───────────────────────────────────────────────
-  const cLatency = mkLine('chart-latency', [
-    { label:'P50', data:H.p50,  borderColor:'#6c63ff', fill:false },
-    { label:'P95', data:H.p95,  borderColor:'#ff4d6d', fill:false },
-    { label:'P99', data:H.p99,  borderColor:'#ffd166', fill:false },
-  ]);
-
-  const cTraffic = mkLine('chart-traffic', [
-    { label:'requests', data:H.traffic, borderColor:'#00d9a3', backgroundColor:'rgba(0,217,163,0.08)', fill:true }
-  ]);
-
-  const cErrors = mkLine('chart-errors', [
-    { label:'error%', data:H.errRate, borderColor:'#ff4d6d', backgroundColor:'rgba(255,77,109,0.08)', fill:true }
-  ]);
-
-  const cCost = mkLine('chart-cost', [
-    { label:'total$', data:H.cost, borderColor:'#ffd166', backgroundColor:'rgba(255,209,102,0.08)', fill:true }
-  ]);
-
-  const cTokens = mkLine('chart-tokens', [
-    { label:'in',  data:H.tokIn,  borderColor:'#4cc9f0', fill:false },
-    { label:'out', data:H.tokOut, borderColor:'#a78bfa', fill:false },
-  ]);
-
-  const cQuality = mkBar('chart-quality', [
-    { label:'quality', data:H.quality, backgroundColor:'rgba(108,99,255,0.7)', borderColor:'#6c63ff', borderWidth:1 }
-  ]);
-
-  // ── Helpers ─────────────────────────────────────────────────────
-  function push(buf, val) { buf.push(val); if(buf.length > MAX_POINTS) buf.shift(); }
-  function badge(el, ok)  { el.className = 'slo-badge ' + (ok ? 'slo-ok':'slo-bad'); }
-  function ts() {
-    const d = new Date();
-    return d.getHours().toString().padStart(2,'0') + ':' +
-           d.getMinutes().toString().padStart(2,'0') + ':' +
-           d.getSeconds().toString().padStart(2,'0');
-  }
-
-  // ── Fetch & update ───────────────────────────────────────────────
-  async function refresh() {
-    try {
-      const r = await fetch(API);
-      const d = await r.json();
-      const label = ts();
-
-      push(H.labels,  label);
-      push(H.p50,     d.latency_p50);
-      push(H.p95,     d.latency_p95);
-      push(H.p99,     d.latency_p99);
-      push(H.traffic, d.traffic);
-
-      const errCount = Object.values(d.error_breakdown||{}).reduce((a,b)=>a+b,0);
-      const errPct   = d.traffic > 0 ? parseFloat(((errCount/d.traffic)*100).toFixed(2)) : 0;
-      push(H.errRate, errPct);
-      push(H.cost,    d.total_cost_usd);
-      push(H.tokIn,   d.tokens_in_total);
-      push(H.tokOut,  d.tokens_out_total);
-      push(H.quality, d.quality_avg);
-
-      // Big numbers
-      document.getElementById('lat-p95').textContent  = d.latency_p95;
-      document.getElementById('lat-p50').textContent  = d.latency_p50;
-      document.getElementById('lat-p99').textContent  = d.latency_p99;
-      document.getElementById('traffic').textContent  = d.traffic;
-      document.getElementById('err-rate').textContent = errPct.toFixed(1) + '%';
-      document.getElementById('total-cost').textContent = '$' + d.total_cost_usd.toFixed(4);
-      document.getElementById('avg-cost').textContent   = '$' + d.avg_cost_usd.toFixed(4);
-      document.getElementById('tokens-total').textContent = (d.tokens_in_total + d.tokens_out_total).toLocaleString();
-      document.getElementById('tok-in').textContent  = d.tokens_in_total.toLocaleString();
-      document.getElementById('tok-out').textContent = d.tokens_out_total.toLocaleString();
-      document.getElementById('quality').textContent = d.quality_avg.toFixed(3);
-
-      // SLO badges
-      badge(document.getElementById('lat-slo-badge'), d.latency_p95 <= 1500);
-      document.getElementById('lat-slo-badge').textContent = d.latency_p95 <= 1500 ? '✓ SLO OK' : '✗ SLO BREACH';
-
-      badge(document.getElementById('err-slo-badge'), errPct < 2);
-      document.getElementById('err-slo-badge').textContent = errPct < 2 ? '✓ SLO OK' : '✗ SLO BREACH';
-
-      badge(document.getElementById('qual-slo-badge'), d.quality_avg >= 0.70);
-      document.getElementById('qual-slo-badge').textContent = d.quality_avg >= 0.70 ? '✓ SLO OK' : '✗ SLO BREACH';
-
-      // Error breakdown
-      const errEl = document.getElementById('err-breakdown');
-      const errs  = Object.entries(d.error_breakdown||{});
-      errEl.innerHTML = errs.length
-        ? errs.map(([k,v])=>`<span>${k}: <b>${v}</b></span>`).join('')
-        : '<span>No errors detected ✓</span>';
-
-      // Refresh all charts
-      [cLatency, cTraffic, cErrors, cCost, cTokens, cQuality].forEach(c => c.update());
-
-      document.getElementById('last-refresh').textContent = 'Last refresh: ' + label;
-      document.getElementById('dot').style.background = '#00d9a3';
-    } catch(e) {
-      document.getElementById('last-refresh').textContent = 'Error fetching metrics';
-      document.getElementById('dot').style.background = '#ff4d6d';
+/* ── Panel 2: Traffic bar chart ── */
+function initTrafficChart() {
+  charts.traffic = makeChart('chart-traffic', {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Requests', data: [], backgroundColor: 'rgba(6,182,212,0.6)', borderColor: '#06b6d4', borderWidth: 1, borderRadius: 5 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+        y: { grid: { color: '#1e2d4550' }, title: { display: true, text: 'cumulative' } }
+      },
+      plugins: { legend: { display: false } }
     }
+  });
+}
+
+/* ── Panel 3: Error doughnut ── */
+function initErrorChart() {
+  charts.errors = makeChart('chart-errors', {
+    type: 'doughnut',
+    data: {
+      labels: ['No Errors'],
+      datasets: [{ data: [1], backgroundColor: ['#1e2d45'], borderColor: '#0a0d14', borderWidth: 2, hoverOffset: 8 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: { legend: { position: 'right' } }
+    }
+  });
+}
+
+/* ── Panel 4: Cost area chart ── */
+function initCostChart() {
+  const ctx = document.getElementById('chart-cost').getContext('2d');
+  const fill = gradient(ctx, ['rgba(139,92,246,0.35)', 'rgba(139,92,246,0.02)']);
+  charts.cost = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Total Cost',
+        data: [],
+        borderColor: '#8b5cf6',
+        backgroundColor: fill,
+        fill: true,
+        tension: 0.4,
+        borderWidth: 2,
+        pointRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
+      interaction: { mode: 'index' },
+      scales: {
+        x: { grid: { color: '#1e2d4550' }, ticks: { maxTicksLimit: 8 } },
+        y: { grid: { color: '#1e2d4550' }, title: { display: true, text: 'USD' } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+/* ── Panel 5: Token multiline ── */
+function initTokenChart() {
+  charts.tokens = makeChart('chart-tokens', {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Tokens In',  data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 2 },
+        { label: 'Tokens Out', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)',  fill: true, tension: 0.4, borderWidth: 2, pointRadius: 2 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
+      interaction: { mode: 'index' },
+      scales: {
+        x: { grid: { color: '#1e2d4550' }, ticks: { maxTicksLimit: 8 } },
+        y: { grid: { color: '#1e2d4550' }, title: { display: true, text: 'tokens' } }
+      },
+      plugins: { legend: { position: 'top' } }
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   UPDATE GAUGE
+═══════════════════════════════════════════════ */
+function updateGauge(score) {
+  const circ        = 2 * Math.PI * 40;   // ≈ 251.3
+  const fraction    = Math.max(0, Math.min(1, score));
+  const offset      = circ * (1 - fraction);
+  const fill        = document.getElementById('gauge-fill');
+  const valEl       = document.getElementById('gauge-value');
+  let color = '#10b981';
+  if (score < 0.4) color = '#ef4444';
+  else if (score < 0.7) color = '#f59e0b';
+
+  fill.style.strokeDashoffset = offset;
+  fill.style.stroke           = color;
+  valEl.textContent           = score.toFixed(2);
+  valEl.style.color           = color;
+}
+
+/* ═══════════════════════════════════════════════
+   UPDATE CHARTS FROM METRICS
+═══════════════════════════════════════════════ */
+function updateCharts(m) {
+  const label = now();
+
+  // Push history
+  if (history.labels.length >= MAX_HISTORY) history.labels.shift();
+  history.labels.push(label);
+
+  pushHistory('p50',       m.latency_p50);
+  pushHistory('p95',       m.latency_p95);
+  pushHistory('p99',       m.latency_p99);
+  pushHistory('traffic',   m.traffic);
+  pushHistory('costAccum', m.total_cost_usd);
+  pushHistory('tokensIn',  m.tokens_in_total);
+  pushHistory('tokensOut', m.tokens_out_total);
+
+  const L = history.labels;
+
+  /* ── Latency ── */
+  const sloLine = new Array(L.length).fill(1500);
+  charts.latency.data.labels                  = [...L];
+  charts.latency.data.datasets[0].data        = [...history.p50];
+  charts.latency.data.datasets[1].data        = [...history.p95];
+  charts.latency.data.datasets[2].data        = [...history.p99];
+  charts.latency.data.datasets[3].data        = sloLine;
+  charts.latency.update('none');
+
+  // SLO badge
+  const sloBadge = document.getElementById('slo-badge');
+  if (m.latency_p95 > 1500) {
+    sloBadge.className = 'badge badge-slo';
+    sloBadge.textContent = '🔴 P95 > SLO!';
+    document.getElementById('alert-latency-status').className = 'alert-status firing-text';
+    document.getElementById('alert-latency-status').textContent = 'FIRING';
+    document.querySelector('[data-rule="high_latency_p95"]').classList.add('firing');
+  } else {
+    sloBadge.className = 'badge badge-ok';
+    sloBadge.textContent = '✓ SLO OK';
+    document.getElementById('alert-latency-status').className = 'alert-status ok-text';
+    document.getElementById('alert-latency-status').textContent = 'OK';
+    document.querySelector('[data-rule="high_latency_p95"]').classList.remove('firing');
   }
 
-  refresh();
-  setInterval(refresh, 15_000);
+  /* ── Traffic ── */
+  charts.traffic.data.labels           = [...L];
+  charts.traffic.data.datasets[0].data = [...history.traffic];
+  charts.traffic.update('none');
+
+  /* ── Errors ── */
+  const errBreak = m.error_breakdown || {};
+  const errKeys  = Object.keys(errBreak);
+  const total_errors = errKeys.reduce((s, k) => s + errBreak[k], 0);
+  const errBadge = document.getElementById('error-badge');
+
+  if (errKeys.length === 0 || total_errors === 0) {
+    charts.errors.data.labels             = ['No Errors'];
+    charts.errors.data.datasets[0].data   = [1];
+    charts.errors.data.datasets[0].backgroundColor = ['#1e2d45'];
+    errBadge.style.cssText = 'background:rgba(16,185,129,0.15);color:var(--accent-green);border:1px solid rgba(16,185,129,0.3)';
+    errBadge.textContent = '0 Errors';
+    document.getElementById('alert-error-status').className = 'alert-status ok-text';
+    document.getElementById('alert-error-status').textContent = 'OK';
+    document.querySelector('[data-rule="critical_error_rate"]').classList.remove('firing');
+  } else {
+    const palette = ['#ef4444','#f59e0b','#8b5cf6','#06b6d4','#10b981'];
+    charts.errors.data.labels                     = errKeys;
+    charts.errors.data.datasets[0].data           = errKeys.map(k => errBreak[k]);
+    charts.errors.data.datasets[0].backgroundColor = errKeys.map((_, i) => palette[i % palette.length]);
+    errBadge.style.cssText = 'background:rgba(239,68,68,0.15);color:var(--accent-red);border:1px solid rgba(239,68,68,0.3)';
+    errBadge.textContent = `${total_errors} Error${total_errors > 1 ? 's' : ''}`;
+    // simple: if any errors fire P1
+    document.getElementById('alert-error-status').className = 'alert-status firing-text';
+    document.getElementById('alert-error-status').textContent = 'FIRING';
+    document.querySelector('[data-rule="critical_error_rate"]').classList.add('firing');
+  }
+  charts.errors.update('none');
+
+  /* ── Cost ── */
+  charts.cost.data.labels              = [...L];
+  charts.cost.data.datasets[0].data    = [...history.costAccum];
+  charts.cost.update('none');
+
+  // Cost alert
+  if (m.total_cost_usd > 5.0) {
+    document.getElementById('alert-cost-status').className = 'alert-status firing-text';
+    document.getElementById('alert-cost-status').textContent = 'FIRING';
+    document.querySelector('[data-rule="cost_budget_spike"]').classList.add('firing');
+  } else {
+    document.getElementById('alert-cost-status').className = 'alert-status ok-text';
+    document.getElementById('alert-cost-status').textContent = 'OK';
+    document.querySelector('[data-rule="cost_budget_spike"]').classList.remove('firing');
+  }
+
+  /* ── Tokens ── */
+  charts.tokens.data.labels              = [...L];
+  charts.tokens.data.datasets[0].data    = [...history.tokensIn];
+  charts.tokens.data.datasets[1].data    = [...history.tokensOut];
+  charts.tokens.update('none');
+
+  // Token alert
+  const tokenOutTotal = m.tokens_out_total;
+  if (tokenOutTotal > 50000) {
+    document.getElementById('alert-token-status').className = 'alert-status firing-text';
+    document.getElementById('alert-token-status').textContent = 'FIRING';
+    document.querySelector('[data-rule="token_burn_spike"]').classList.add('firing');
+  } else {
+    document.getElementById('alert-token-status').className = 'alert-status ok-text';
+    document.getElementById('alert-token-status').textContent = 'OK';
+    document.querySelector('[data-rule="token_burn_spike"]').classList.remove('firing');
+  }
+
+  /* ── Gauge ── */
+  updateGauge(m.quality_avg);
+
+  /* ── Stat strip ── */
+  document.getElementById('s-traffic').textContent  = m.traffic;
+  document.getElementById('s-p50').textContent       = m.latency_p50.toFixed(0);
+  document.getElementById('s-p95').textContent       = m.latency_p95.toFixed(0);
+  document.getElementById('s-p99').textContent       = m.latency_p99.toFixed(0);
+  document.getElementById('s-cost').textContent      = '$' + m.total_cost_usd.toFixed(4);
+  document.getElementById('s-quality').textContent   = m.quality_avg.toFixed(3);
+}
+
+/* ═══════════════════════════════════════════════
+   UPDATE LOG TABLE
+═══════════════════════════════════════════════ */
+function updateLogs(entries) {
+  const tbody = document.getElementById('log-tbody');
+  const rows  = entries.slice(-50).reverse();
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-hint">No logs yet – start the server and run load_test.py</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(e => {
+    const ts      = e.ts ? e.ts.replace('T',' ').replace('Z','') : '–';
+    const level   = e.level || 'info';
+    const event   = e.event || '–';
+    const service = e.service || '–';
+    const latency = e.latency_ms != null ? e.latency_ms + ' ms' : '–';
+    return `<tr>
+      <td class="log-ts">${ts.slice(11,19)}</td>
+      <td><span class="log-level ${level}">${level}</span></td>
+      <td class="log-event">${event}</td>
+      <td>${service}</td>
+      <td>${latency}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   UPDATE HEALTH / INCIDENTS
+═══════════════════════════════════════════════ */
+function updateHealth(h) {
+  setHealth(h.ok, h.ok ? '● Server Online' : '✖ Server Error');
+  const incidents = h.incidents || {};
+  Object.keys(incidents).forEach(name => {
+    const active = incidents[name];
+    incidentState[name] = active;
+    const card = document.getElementById('inc-' + name);
+    const btn  = card ? card.querySelector('.incident-toggle') : null;
+    if (!card) return;
+    if (active) {
+      card.classList.add('active');
+      btn.className = 'incident-toggle on';
+      btn.textContent = 'Disable';
+    } else {
+      card.classList.remove('active');
+      btn.className = 'incident-toggle off';
+      btn.textContent = 'Enable';
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   FETCH ALL DATA
+═══════════════════════════════════════════════ */
+async function fetchAll() {
+  const base = apiBase();
+  document.getElementById('footer-url').textContent = base.replace('http://','').replace('https://','');
+  document.getElementById('btn-refresh').textContent = '⟳';
+
+  try {
+    const [mRes, hRes, lRes] = await Promise.all([
+      fetch(`${base}/metrics`),
+      fetch(`${base}/health`),
+      fetch(`${base}/logs?last=200`),
+    ]);
+
+    if (!mRes.ok || !hRes.ok) throw new Error(`HTTP ${mRes.status}`);
+
+    const metrics = await mRes.json();
+    const health  = await hRes.json();
+    const logs    = lRes.ok ? await lRes.json() : [];
+
+    updateCharts(metrics);
+    updateHealth(health);
+    updateLogs(logs);
+
+    fetchCount++;
+    document.getElementById('last-updated').textContent = `✓ Last updated: ${new Date().toLocaleTimeString('vi-VN')}`;
+
+  } catch (e) {
+    setHealth(false, `✖ ${e.message}`);
+    document.getElementById('last-updated').textContent = `⚠ Connection failed – is server running?`;
+    console.warn('[Dashboard] Fetch error:', e);
+  }
+
+  document.getElementById('btn-refresh').textContent = '↺ Refresh Now';
+}
+
+/* ═══════════════════════════════════════════════
+   INCIDENTS TOGGLE
+═══════════════════════════════════════════════ */
+async function toggleIncident(name, btn) {
+  const base    = apiBase();
+  const current = incidentState[name];
+  const action  = current ? 'disable' : 'enable';
+  try {
+    const res = await fetch(`${base}/incidents/${name}/${action}`, { method: 'POST' });
+    if (res.ok) {
+      incidentState[name] = !current;
+      const card = document.getElementById('inc-' + name);
+      if (!current) {
+        card.classList.add('active');
+        btn.className = 'incident-toggle on';
+        btn.textContent = 'Disable';
+      } else {
+        card.classList.remove('active');
+        btn.className = 'incident-toggle off';
+        btn.textContent = 'Enable';
+      }
+    }
+  } catch(e) {
+    alert('Failed to toggle incident – is server running?\n' + e.message);
+  }
+}
+
+async function triggerIncident(name) {
+  const base = apiBase();
+  try {
+    await fetch(`${base}/incidents/${name}/enable`, { method: 'POST' });
+    await fetchAll();
+  } catch(e) { console.warn(e); }
+}
+
+/* ═══════════════════════════════════════════════
+   COUNTDOWN TIMER
+═══════════════════════════════════════════════ */
+function startCountdown() {
+  if (timerInterval) clearInterval(timerInterval);
+  countdownVal = REFRESH_SEC;
+  document.getElementById('countdown').textContent = countdownVal;
+
+  timerInterval = setInterval(() => {
+    countdownVal--;
+    document.getElementById('countdown').textContent = countdownVal;
+    if (countdownVal <= 0) {
+      fetchAll();
+      countdownVal = REFRESH_SEC;
+    }
+  }, 1000);
+}
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  initLatencyChart();
+  initTrafficChart();
+  initErrorChart();
+  initCostChart();
+  initTokenChart();
+
+  fetchAll();
+  startCountdown();
+});
 </script>
 </body>
 </html>

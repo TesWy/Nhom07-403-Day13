@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
 import os
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, HTMLResponse
+from pathlib import Path
 from structlog.contextvars import bind_contextvars
 
 from .agent import LabAgent
 from .incidents import disable, enable, status
-from .logging_config import configure_logging, get_logger
+from .logging_config import configure_logging, get_logger, LOG_PATH
 from .metrics import record_error, snapshot
 from .middleware import CorrelationIdMiddleware
 from .pii import hash_user_id, summarize_text
@@ -18,6 +21,14 @@ from .tracing import tracing_enabled
 configure_logging()
 log = get_logger()
 app = FastAPI(title="Day 13 Observability Lab")
+
+# Allow dashboard.html opened as a local file to fetch API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.add_middleware(CorrelationIdMiddleware)
 agent = LabAgent()
 
@@ -40,6 +51,27 @@ async def health() -> dict:
 @app.get("/metrics")
 async def metrics() -> dict:
     return snapshot()
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard() -> str:
+    return Path("dashboard.html").read_text(encoding="utf-8")
+
+
+@app.get("/logs")
+async def get_logs(last: int = 200) -> JSONResponse:
+    """Return the last N log entries from the JSONL log file as a JSON array."""
+    entries: list[dict] = []
+    if LOG_PATH.exists():
+        lines = LOG_PATH.read_text(encoding="utf-8").splitlines()
+        for line in lines:
+            line = line.strip()
+            if line:
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+    return JSONResponse(entries[-last:])
 
 
 @app.post("/chat", response_model=ChatResponse)
