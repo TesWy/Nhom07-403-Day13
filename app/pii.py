@@ -5,17 +5,21 @@ import re
 
 PII_PATTERNS: dict[str, str] = {
     "email": r"[\w\.-]+@[\w\.-]+\.\w+",
-    "phone_vn": r"(?:\+84|0)[ \.-]?\d{3}[ \.-]?\d{3}[ \.-]?\d{3,4}", # Matches 090 123 4567, 090.123.4567, etc.
+    "phone_vn": r"(?:\+84|0)[ \.-]?\d{3}[ \.-]?\d{3}[ \.-]?\d{3,4}",
     "cccd": r"\b\d{12}\b",
     "credit_card": r"\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b",
-    # TODO: Add more patterns (e.g., Passport, Vietnamese address keywords)
+    "passport": r"\b[A-Z]\d{7,8}\b",
+    "address_mo_ho": r"\b(live in|from|based in|located in|in)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
+    "address_en": r"\b\d{1,5}\s+[A-Za-z0-9\s]{2,}(Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Parkway|Pkwy)(?:\s+(Apt|Suite|Unit)\s*\w+)?\b(?:,\s*[A-Za-z\s]+)*",
 }
 
 
 def scrub_text(text: str) -> str:
+    if not isinstance(text, str):
+        return text
     safe = text
     for name, pattern in PII_PATTERNS.items():
-        safe = re.sub(pattern, f"[REDACTED_{name.upper()}]", safe)
+        safe = re.sub(pattern, f"[REDACTED_{name.upper()}]", safe, flags=re.UNICODE)
     return safe
 
 
