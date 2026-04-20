@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-import json
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
-from pathlib import Path
+from fastapi.responses import FileResponse, JSONResponse
 from structlog.contextvars import bind_contextvars
 
 from .agent import LabAgent
 from .incidents import disable, enable, status
-from .logging_config import configure_logging, get_logger, LOG_PATH
+from .logging_config import configure_logging, get_logger
 from .metrics import record_error, snapshot
 from .middleware import CorrelationIdMiddleware
 from .pii import hash_user_id, summarize_text
@@ -21,16 +19,11 @@ from .tracing import tracing_enabled
 configure_logging()
 log = get_logger()
 app = FastAPI(title="Day 13 Observability Lab")
-
-# Allow dashboard.html opened as a local file to fetch API
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 app.add_middleware(CorrelationIdMiddleware)
 agent = LabAgent()
+
+_ROOT_DIR = Path(__file__).resolve().parent.parent
+_DASHBOARD_PATH = _ROOT_DIR / "dashboard.html"
 
 
 @app.on_event("startup")
@@ -53,30 +46,15 @@ async def metrics() -> dict:
     return snapshot()
 
 
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard() -> str:
-    return Path("dashboard.html").read_text(encoding="utf-8")
-
-
-@app.get("/logs")
-async def get_logs(last: int = 200) -> JSONResponse:
-    """Return the last N log entries from the JSONL log file as a JSON array."""
-    entries: list[dict] = []
-    if LOG_PATH.exists():
-        lines = LOG_PATH.read_text(encoding="utf-8").splitlines()
-        for line in lines:
-            line = line.strip()
-            if line:
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
-    return JSONResponse(entries[-last:])
+@app.get("/dashboard")
+async def dashboard() -> FileResponse:
+    return FileResponse(_DASHBOARD_PATH)
 
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: Request, body: ChatRequest) -> ChatResponse:
-    # Enrich logs with request context (user_id_hash, session_id, feature, model, env)
+    # TODO: Enrich logs with request context (user_id_hash, session_id, feature, model, env)
+    # bind_contextvars(...)
     bind_contextvars(
         user_id_hash=hash_user_id(body.user_id),
         session_id=body.session_id,
@@ -84,7 +62,6 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
         model=agent.model,
         env=os.getenv("APP_ENV", "dev"),
     )
-    
     log.info(
         "request_received",
         service="api",
