@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Day 13 Observability Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2a2d3e;
+      --accent: #6c63ff;
+      --green: #00d9a3;
+      --red: #ff4d6d;
+      --yellow: #ffd166;
+      --blue: #4cc9f0;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --slo-red: rgba(255,77,109,0.25);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.3px; }
+    header h1 span { color: var(--accent); }
+    #status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    #dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; } 50% { opacity:0.3; }
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      padding: 20px 24px;
+    }
+    @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 700px)  { .grid { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--accent);
+      border-radius: 12px 12px 0 0;
+    }
+    .panel.green::before  { background: var(--green); }
+    .panel.red::before    { background: var(--red); }
+    .panel.yellow::before { background: var(--yellow); }
+    .panel.blue::before   { background: var(--blue); }
+    .panel.purple::before { background: var(--accent); }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .big-num {
+      font-size: 42px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .sub-row {
+      display: flex;
+      gap: 16px;
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .sub-row span b { color: var(--text); }
+    .slo-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+    .slo-ok  { background: rgba(0,217,163,0.15); color: var(--green); }
+    .slo-bad { background: rgba(255,77,109,0.15); color: var(--red); }
+
+    canvas { max-height: 160px; }
+
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 12px 0 24px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📊 Day 13 <span>Observability</span> Dashboard</h1>
+  <div id="status">
+    <div id="dot"></div>
+    <span id="last-refresh">Connecting…</span>
+    <span>· Auto-refresh 30s</span>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- Panel 1: Latency P50/P95/P99 -->
+  <div class="panel purple">
+    <div class="panel-title">⏱ Latency — P50 / P95 / P99 (ms)</div>
+    <div class="big-num" id="lat-p95">—</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">P95 <span class="slo-badge slo-ok" id="lat-slo-badge">≤ 1500ms SLO</span></div>
+    <div class="sub-row">
+      <span>P50: <b id="lat-p50">—</b> ms</span>
+      <span>P99: <b id="lat-p99">—</b> ms</span>
+    </div>
+    <canvas id="chart-latency" style="margin-top:14px"></canvas>
+  </div>
+
+  <!-- Panel 2: Traffic -->
+  <div class="panel green">
+    <div class="panel-title">🚦 Traffic — Total Requests</div>
+    <div class="big-num" id="traffic">—</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">cumulative requests</div>
+    <div class="sub-row">
+      <span>Since startup</span>
+    </div>
+    <canvas id="chart-traffic" style="margin-top:14px"></canvas>
+  </div>
+
+  <!-- Panel 3: Error Rate -->
+  <div class="panel red">
+    <div class="panel-title">❌ Error Rate — Breakdown</div>
+    <div class="big-num" id="err-rate">—</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">error % <span class="slo-badge slo-ok" id="err-slo-badge">SLO &lt; 2%</span></div>
+    <div class="sub-row" id="err-breakdown">
+      <span>No errors detected</span>
+    </div>
+    <canvas id="chart-errors" style="margin-top:14px"></canvas>
+  </div>
+
+  <!-- Panel 4: Cost -->
+  <div class="panel yellow">
+    <div class="panel-title">💰 Cost Over Time (USD)</div>
+    <div class="big-num" id="total-cost">—</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">total · <b id="avg-cost">—</b> avg/req</div>
+    <div class="sub-row">
+      <span>Daily budget SLO: <b>$5.00</b></span>
+    </div>
+    <canvas id="chart-cost" style="margin-top:14px"></canvas>
+  </div>
+
+  <!-- Panel 5: Tokens In/Out -->
+  <div class="panel blue">
+    <div class="panel-title">🔤 Tokens In / Out</div>
+    <div class="big-num" id="tokens-total">—</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">total tokens processed</div>
+    <div class="sub-row">
+      <span>In: <b id="tok-in">—</b></span>
+      <span>Out: <b id="tok-out">—</b></span>
+    </div>
+    <canvas id="chart-tokens" style="margin-top:14px"></canvas>
+  </div>
+
+  <!-- Panel 6: Quality Score -->
+  <div class="panel">
+    <div class="panel-title">⭐ Quality Proxy — Avg Score</div>
+    <div class="big-num" id="quality">—</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">heuristic 0.0→1.0 · SLO ≥ 0.70 <span class="slo-badge slo-ok" id="qual-slo-badge">OK</span></div>
+    <div class="sub-row">
+      <span>Based on answer length + doc overlap</span>
+    </div>
+    <canvas id="chart-quality" style="margin-top:14px"></canvas>
+  </div>
+
+</div>
+
+<footer>Day 13 Observability Lab · VinUNI AI · Polling <strong>http://localhost:8000/metrics</strong></footer>
+
+<script>
+  const API = 'http://localhost:8000/metrics';
+  const MAX_POINTS = 20;
+
+  // ── history buffers ─────────────────────────────────────────────
+  const H = {
+    labels:    [],
+    p50:[], p95:[], p99:[],
+    traffic:   [],
+    errRate:   [],
+    cost:      [],
+    tokIn:[],  tokOut:[],
+    quality:   [],
+  };
+
+  // ── Chart factory ───────────────────────────────────────────────
+  function mkLine(id, datasets, opts={}) {
+    return new Chart(document.getElementById(id), {
+      type: 'line',
+      data: { labels: H.labels, datasets },
+      options: {
+        animation: false,
+        plugins: { legend: { display: datasets.length > 1, labels:{ color:'#8892a4', boxWidth:10, font:{size:11} } } },
+        scales: {
+          x: { display: false },
+          y: { grid:{ color:'#2a2d3e' }, ticks:{ color:'#8892a4', font:{size:10} }, ...opts.y },
+        },
+        elements: { point:{ radius:0 }, line:{ tension:0.35, borderWidth:2 } },
+        maintainAspectRatio: false,
+      }
+    });
+  }
+
+  function mkBar(id, datasets) {
+    return new Chart(document.getElementById(id), {
+      type: 'bar',
+      data: { labels: H.labels, datasets },
+      options: {
+        animation: false,
+        plugins: { legend:{ display:false } },
+        scales: {
+          x: { display:false },
+          y: { grid:{ color:'#2a2d3e' }, ticks:{ color:'#8892a4', font:{size:10} }, min:0, max:1 },
+        },
+        maintainAspectRatio: false,
+      }
+    });
+  }
+
+  // SLO lines plugin
+  const sloPlugin = (yVal, color) => ({
+    id: 'sloLine',
+    afterDraw(chart) {
+      const {ctx, chartArea:{left,right}, scales:{y}} = chart;
+      const yPx = y.getPixelForValue(yVal);
+      ctx.save();
+      ctx.setLineDash([6,4]);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(left,yPx); ctx.lineTo(right,yPx); ctx.stroke();
+      ctx.restore();
+    }
+  });
+
+  // ── Create charts ───────────────────────────────────────────────
+  const cLatency = mkLine('chart-latency', [
+    { label:'P50', data:H.p50,  borderColor:'#6c63ff', fill:false },
+    { label:'P95', data:H.p95,  borderColor:'#ff4d6d', fill:false },
+    { label:'P99', data:H.p99,  borderColor:'#ffd166', fill:false },
+  ]);
+
+  const cTraffic = mkLine('chart-traffic', [
+    { label:'requests', data:H.traffic, borderColor:'#00d9a3', backgroundColor:'rgba(0,217,163,0.08)', fill:true }
+  ]);
+
+  const cErrors = mkLine('chart-errors', [
+    { label:'error%', data:H.errRate, borderColor:'#ff4d6d', backgroundColor:'rgba(255,77,109,0.08)', fill:true }
+  ]);
+
+  const cCost = mkLine('chart-cost', [
+    { label:'total$', data:H.cost, borderColor:'#ffd166', backgroundColor:'rgba(255,209,102,0.08)', fill:true }
+  ]);
+
+  const cTokens = mkLine('chart-tokens', [
+    { label:'in',  data:H.tokIn,  borderColor:'#4cc9f0', fill:false },
+    { label:'out', data:H.tokOut, borderColor:'#a78bfa', fill:false },
+  ]);
+
+  const cQuality = mkBar('chart-quality', [
+    { label:'quality', data:H.quality, backgroundColor:'rgba(108,99,255,0.7)', borderColor:'#6c63ff', borderWidth:1 }
+  ]);
+
+  // ── Helpers ─────────────────────────────────────────────────────
+  function push(buf, val) { buf.push(val); if(buf.length > MAX_POINTS) buf.shift(); }
+  function badge(el, ok)  { el.className = 'slo-badge ' + (ok ? 'slo-ok':'slo-bad'); }
+  function ts() {
+    const d = new Date();
+    return d.getHours().toString().padStart(2,'0') + ':' +
+           d.getMinutes().toString().padStart(2,'0') + ':' +
+           d.getSeconds().toString().padStart(2,'0');
+  }
+
+  // ── Fetch & update ───────────────────────────────────────────────
+  async function refresh() {
+    try {
+      const r = await fetch(API);
+      const d = await r.json();
+      const label = ts();
+
+      push(H.labels,  label);
+      push(H.p50,     d.latency_p50);
+      push(H.p95,     d.latency_p95);
+      push(H.p99,     d.latency_p99);
+      push(H.traffic, d.traffic);
+
+      const errCount = Object.values(d.error_breakdown||{}).reduce((a,b)=>a+b,0);
+      const errPct   = d.traffic > 0 ? parseFloat(((errCount/d.traffic)*100).toFixed(2)) : 0;
+      push(H.errRate, errPct);
+      push(H.cost,    d.total_cost_usd);
+      push(H.tokIn,   d.tokens_in_total);
+      push(H.tokOut,  d.tokens_out_total);
+      push(H.quality, d.quality_avg);
+
+      // Big numbers
+      document.getElementById('lat-p95').textContent  = d.latency_p95;
+      document.getElementById('lat-p50').textContent  = d.latency_p50;
+      document.getElementById('lat-p99').textContent  = d.latency_p99;
+      document.getElementById('traffic').textContent  = d.traffic;
+      document.getElementById('err-rate').textContent = errPct.toFixed(1) + '%';
+      document.getElementById('total-cost').textContent = '$' + d.total_cost_usd.toFixed(4);
+      document.getElementById('avg-cost').textContent   = '$' + d.avg_cost_usd.toFixed(4);
+      document.getElementById('tokens-total').textContent = (d.tokens_in_total + d.tokens_out_total).toLocaleString();
+      document.getElementById('tok-in').textContent  = d.tokens_in_total.toLocaleString();
+      document.getElementById('tok-out').textContent = d.tokens_out_total.toLocaleString();
+      document.getElementById('quality').textContent = d.quality_avg.toFixed(3);
+
+      // SLO badges
+      badge(document.getElementById('lat-slo-badge'), d.latency_p95 <= 1500);
+      document.getElementById('lat-slo-badge').textContent = d.latency_p95 <= 1500 ? '✓ SLO OK' : '✗ SLO BREACH';
+
+      badge(document.getElementById('err-slo-badge'), errPct < 2);
+      document.getElementById('err-slo-badge').textContent = errPct < 2 ? '✓ SLO OK' : '✗ SLO BREACH';
+
+      badge(document.getElementById('qual-slo-badge'), d.quality_avg >= 0.70);
+      document.getElementById('qual-slo-badge').textContent = d.quality_avg >= 0.70 ? '✓ SLO OK' : '✗ SLO BREACH';
+
+      // Error breakdown
+      const errEl = document.getElementById('err-breakdown');
+      const errs  = Object.entries(d.error_breakdown||{});
+      errEl.innerHTML = errs.length
+        ? errs.map(([k,v])=>`<span>${k}: <b>${v}</b></span>`).join('')
+        : '<span>No errors detected ✓</span>';
+
+      // Refresh all charts
+      [cLatency, cTraffic, cErrors, cCost, cTokens, cQuality].forEach(c => c.update());
+
+      document.getElementById('last-refresh').textContent = 'Last refresh: ' + label;
+      document.getElementById('dot').style.background = '#00d9a3';
+    } catch(e) {
+      document.getElementById('last-refresh').textContent = 'Error fetching metrics';
+      document.getElementById('dot').style.background = '#ff4d6d';
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 15_000);
+</script>
+</body>
+</html>
